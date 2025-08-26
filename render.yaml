@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: weather-dashboard
+    env: node
+    plan: free
+    buildCommand: "npm ci"
+    startCommand: "node server.js"
+    autoDeploy: true
+    envVars:
+      - key: OPENWEATHER_API_KEY
+        sync: false

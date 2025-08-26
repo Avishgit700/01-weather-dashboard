@@ -1,9 +1,6 @@
-// WeatherNow – vanilla JS frontend that calls Vercel /api/* functions
-
 class WeatherApp {
   constructor() {
-    // Element refs
-    this.els = {
+    this.elements = {
       cityInput: document.getElementById('cityInput'),
       searchBtn: document.getElementById('searchBtn'),
       locationBtn: document.getElementById('locationBtn'),
@@ -32,70 +29,62 @@ class WeatherApp {
     };
 
     this.lastCity = localStorage.getItem('lastCity') || 'London';
+    this.init();
+  }
 
+  init() {
     this.attachEvents();
     this.updateDateTime();
-    this.tick = setInterval(() => this.updateDateTime(), 60_000);
-
-    // kick-off
     this.loadWeatherData(this.lastCity);
+    setInterval(() => this.updateDateTime(), 60_000);
   }
 
   attachEvents() {
-    this.els.searchBtn.addEventListener('click', () => this.handleSearch());
-    this.els.cityInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') this.handleSearch();
-    });
-    this.els.locationBtn.addEventListener('click', () => this.getCurrentLocation());
+    this.elements.searchBtn.addEventListener('click', () => this.handleSearch());
+    this.elements.cityInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.handleSearch(); });
+    this.elements.locationBtn.addEventListener('click', () => this.getCurrentLocation());
   }
 
   handleSearch() {
-    const city = this.els.cityInput.value.trim();
+    const city = this.elements.cityInput.value.trim();
     if (!city) return;
     this.loadWeatherData(city);
-    this.els.cityInput.value = '';
+    this.elements.cityInput.value = '';
   }
 
   getCurrentLocation() {
-    if (!('geolocation' in navigator)) {
-      this.showError('Geolocation is not supported by this browser.');
-      return;
-    }
+    if (!navigator.geolocation) return this.showError('Geolocation not supported.');
     this.showLoading();
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => this.loadWeatherByCoords(coords.latitude, coords.longitude),
-      (err) => {
-        console.warn('Geolocation error:', err);
+      pos => this.loadWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
+      err => {
+        console.error(err);
         this.showError('Unable to get your location. Please search for a city instead.');
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
+      }
     );
   }
 
   async fetchJSON(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
   }
 
   async loadWeatherData(city) {
     try {
       this.showLoading();
-
-      const [current, forecast] = await Promise.all([
+      const [currentData, forecastData] = await Promise.all([
         this.fetchJSON(`/api/current?city=${encodeURIComponent(city)}`),
         this.fetchJSON(`/api/forecast?city=${encodeURIComponent(city)}`)
       ]);
-
-      this.renderCurrent(current);
-      this.renderHourly(forecast);
-      this.renderDaily(forecast);
-
+      this.displayCurrentWeather(currentData);
+      this.displayHourlyForecast(forecastData);
+      this.displayDailyForecast(forecastData);
       localStorage.setItem('lastCity', city);
       this.hideLoading();
     } catch (e) {
       console.error(e);
-      this.showError(`Unable to find weather data for "${city}". Please check the city name and try again.`);
+      this.showError(`Unable to find weather data for "${city}".`);
     }
   }
 
@@ -103,16 +92,14 @@ class WeatherApp {
     try {
       this.showLoading();
       const qp = `lat=${lat}&lon=${lon}`;
-      const [current, forecast] = await Promise.all([
+      const [currentData, forecastData] = await Promise.all([
         this.fetchJSON(`/api/current?${qp}`),
         this.fetchJSON(`/api/forecast?${qp}`)
       ]);
-
-      this.renderCurrent(current);
-      this.renderHourly(forecast);
-      this.renderDaily(forecast);
-
-      localStorage.setItem('lastCity', current?.name || 'Your location');
+      this.displayCurrentWeather(currentData);
+      this.displayHourlyForecast(forecastData);
+      this.displayDailyForecast(forecastData);
+      localStorage.setItem('lastCity', currentData?.name || 'Your location');
       this.hideLoading();
     } catch (e) {
       console.error(e);
@@ -120,150 +107,129 @@ class WeatherApp {
     }
   }
 
-  renderCurrent(data) {
-    const { name, sys = {}, main = {}, weather = [], wind = {}, visibility = 0, clouds = {} } = data || {};
-    const w = weather[0] || {};
+  displayCurrentWeather(data) {
+    const { name, sys, main, weather, wind, visibility, clouds } = data;
+    this.elements.currentLocation.textContent = `${name || '—'}, ${sys?.country || ''}`;
+    this.elements.currentTemp.textContent = `${Math.round(main?.temp ?? 0)}°C`;
+    this.elements.weatherDesc.textContent = weather?.[0]?.description ?? '—';
+    this.elements.feelsLike.textContent = `Feels like ${Math.round(main?.feels_like ?? 0)}°C`;
 
-    // Text
-    this.els.currentLocation.textContent = [name, sys.country].filter(Boolean).join(', ');
-    this.els.currentTemp.textContent = Number.isFinite(main.temp) ? `${Math.round(main.temp)}°C` : '—';
-    this.els.weatherDesc.textContent = (w.description || '—').toString();
-    this.els.feelsLike.textContent = Number.isFinite(main.feels_like) ? `Feels like ${Math.round(main.feels_like)}°C` : '—';
+    // icon
+    this.elements.weatherIcon.className = this.iconFromOWM(weather?.[0]?.icon);
 
-    // Icon
-    this.els.weatherIcon.className = this.iconFor(w.icon, w.id);
-
-    // Details
-    this.els.visibility.textContent = `${(visibility / 1000).toFixed(1)} km`;
-    this.els.humidity.textContent = `${main.humidity ?? '—'}%`;
-    this.els.windSpeed.textContent = `${Math.round((wind.speed || 0) * 3.6)} km/h`;
-    this.els.pressure.textContent = `${main.pressure ?? '—'} mb`;
-    this.els.uvIndex.textContent = '—'; // (UV not in free OWM endpoints)
-    this.els.cloudiness.textContent = `${clouds.all ?? '—'}%`;
-
-    this.els.currentWeather.classList.remove('fade-in');
-    // force reflow for animation restart
-    // eslint-disable-next-line no-unused-expressions
-    this.els.currentWeather.offsetHeight;
-    this.els.currentWeather.classList.add('fade-in');
+    // details
+    this.elements.visibility.textContent = visibility != null ? `${(visibility/1000).toFixed(1)} km` : '—';
+    this.elements.humidity.textContent = main?.humidity != null ? `${main.humidity}%` : '—';
+    this.elements.windSpeed.textContent = wind?.speed != null ? `${Math.round(wind.speed * 3.6)} km/h` : '—';
+    this.elements.pressure.textContent = main?.pressure != null ? `${main.pressure} mb` : '—';
+    this.elements.uvIndex.textContent = '—'; // (not in free API)
+    this.elements.cloudiness.textContent = clouds?.all != null ? `${clouds.all}%` : '—';
   }
 
-  renderHourly(forecastData) {
-    const items = (forecastData?.list || []).slice(0, 8);
-    this.els.hourlyContainer.innerHTML = items.map((it) => {
-      const t = new Date(it.dt * 1000);
-      const h = t.getHours();
-      const ampm = h === 0 ? '12 AM' : h <= 12 ? `${h} AM` : `${h - 12} PM`;
+  displayHourlyForecast(data) {
+    const hours = data.list.slice(0, 8);
+    this.elements.hourlyContainer.innerHTML = hours.map(item => {
+      const time = new Date(item.dt * 1000);
+      const hour = time.getHours();
+      const label = hour === 0 ? '12 AM' : (hour <= 12 ? `${hour} AM` : `${hour-12} PM`);
       return `
         <div class="hourly-item">
-          <div class="time">${ampm}</div>
-          <i class="${this.iconFor(it.weather?.[0]?.icon, it.weather?.[0]?.id)}"></i>
-          <div class="temp">${Math.round(it.main?.temp)}°</div>
+          <div class="time">${label}</div>
+          <i class="${this.iconFromOWM(item.weather[0].icon)}"></i>
+          <div class="temp">${Math.round(item.main.temp)}°</div>
         </div>
       `;
     }).join('');
   }
 
-  renderDaily(forecastData) {
-    const groups = this.groupByDay(forecastData?.list || []);
-    this.els.forecastContainer.innerHTML = groups.map((d) => `
+  displayDailyForecast(data) {
+    const grouped = this.groupByDay(data.list);
+    this.elements.forecastContainer.innerHTML = grouped.map(day => `
       <div class="forecast-item">
-        <div class="forecast-day">${d.day}</div>
-        <div class="forecast-desc">
-          <i class="${this.iconFor(d.icon, d.id)}"></i>
-          <span>${d.description}</span>
-        </div>
-        <div class="forecast-temps">
-          <span class="high">${d.high}°</span>
-          <span class="low">${d.low}°</span>
-        </div>
-        <div class="forecast-humidity">${d.humidity}%</div>
+        <div class="forecast-day">${day.day}</div>
+        <div class="forecast-desc"><i class="${this.iconFromOWM(day.icon)}"></i><span>${day.description}</span></div>
+        <div class="forecast-temps"><span class="high">${day.high}°</span><span class="low">${day.low}°</span></div>
+        <div class="forecast-humidity">${day.humidity}%</div>
       </div>
     `).join('');
   }
 
   groupByDay(list) {
-    const days = {};
-    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const todayKey = new Date().toDateString();
+    const map = new Map();
+    const dn = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const todayStr = new Date().toDateString();
 
     for (const item of list) {
-      const d = new Date(item.dt * 1000);
-      const key = d.toDateString();
-      if (!days[key]) {
-        days[key] = {
-          key,
-          day: key === todayKey ? 'Today' : dayNames[d.getDay()],
+      const date = new Date(item.dt * 1000);
+      const key = date.toDateString();
+      if (!map.has(key)) {
+        map.set(key, {
+          label: key === todayStr ? 'Today' : dn[date.getDay()],
           temps: [],
           humidity: [],
-          icon: item.weather?.[0]?.icon,
-          id: item.weather?.[0]?.id,
-          description: item.weather?.[0]?.description || ''
-        };
+          icon: item.weather[0].icon,
+          description: item.weather[0].description
+        });
       }
-      days[key].temps.push(item.main?.temp);
-      days[key].humidity.push(item.main?.humidity);
+      const bucket = map.get(key);
+      bucket.temps.push(item.main.temp);
+      bucket.humidity.push(item.main.humidity);
     }
 
-    return Object.values(days)
-      .slice(0, 5)
-      .map((x) => ({
-        day: x.day,
-        high: Math.round(Math.max(...x.temps)),
-        low: Math.round(Math.min(...x.temps)),
-        humidity: Math.round(x.humidity.reduce((a, b) => a + b) / x.humidity.length),
-        icon: x.icon,
-        id: x.id,
-        description: x.description
-      }));
+    return Array.from(map.entries()).slice(0, 5).map(([_, v]) => ({
+      day: v.label,
+      high: Math.round(Math.max(...v.temps)),
+      low: Math.round(Math.min(...v.temps)),
+      humidity: Math.round(v.humidity.reduce((a,b)=>a+b,0) / v.humidity.length),
+      icon: v.icon,
+      description: v.description
+    }));
   }
 
-  iconFor(code, id) {
-    const map = {
-      '01d': 'fas fa-sun', '01n': 'fas fa-moon',
-      '02d': 'fas fa-cloud-sun', '02n': 'fas fa-cloud-moon',
-      '03d': 'fas fa-cloud', '03n': 'fas fa-cloud',
-      '04d': 'fas fa-cloud', '04n': 'fas fa-cloud',
-      '09d': 'fas fa-cloud-rain', '09n': 'fas fa-cloud-rain',
-      '10d': 'fas fa-cloud-sun-rain', '10n': 'fas fa-cloud-moon-rain',
-      '11d': 'fas fa-bolt', '11n': 'fas fa-bolt',
-      '13d': 'fas fa-snowflake', '13n': 'fas fa-snowflake',
-      '50d': 'fas fa-smog', '50n': 'fas fa-smog'
+  iconFromOWM(code) {
+    const m = {
+      '01d':'fas fa-sun', '01n':'fas fa-moon',
+      '02d':'fas fa-cloud-sun', '02n':'fas fa-cloud-moon',
+      '03d':'fas fa-cloud', '03n':'fas fa-cloud',
+      '04d':'fas fa-cloud', '04n':'fas fa-cloud',
+      '09d':'fas fa-cloud-rain','09n':'fas fa-cloud-rain',
+      '10d':'fas fa-cloud-sun-rain','10n':'fas fa-cloud-moon-rain',
+      '11d':'fas fa-bolt','11n':'fas fa-bolt',
+      '13d':'fas fa-snowflake','13n':'fas fa-snowflake',
+      '50d':'fas fa-smog','50n':'fas fa-smog'
     };
-    return map[code] || 'fas fa-cloud';
+    return m[code] || 'fas fa-cloud';
   }
 
   updateDateTime() {
     const now = new Date();
-    this.els.currentDate.textContent = now.toLocaleDateString(undefined, {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    this.elements.currentDate.textContent = now.toLocaleDateString(undefined, {
+      weekday:'long', year:'numeric', month:'long', day:'numeric'
     });
-    this.els.currentTime.textContent = now.toLocaleTimeString(undefined, {
-      hour: 'numeric', minute: '2-digit', hour12: true
+    this.elements.currentTime.textContent = now.toLocaleTimeString(undefined, {
+      hour:'numeric', minute:'2-digit'
     });
   }
 
-  showLoading() {
-    this.els.loading.classList.remove('hidden');
-    this.els.errorMessage.classList.add('hidden');
-    this.els.currentWeather.style.opacity = '0.7';
+  showLoading(){
+    this.elements.loading.classList.remove('hidden');
+    this.elements.errorMessage.classList.add('hidden');
   }
-  hideLoading() {
-    this.els.loading.classList.add('hidden');
-    this.els.currentWeather.style.opacity = '1';
+  hideLoading(){
+    this.elements.loading.classList.add('hidden');
   }
-  showError(msg) {
-    this.els.errorText.textContent = msg;
-    this.els.errorMessage.classList.remove('hidden');
-    this.els.loading.classList.add('hidden');
-    this.els.currentWeather.style.opacity = '1';
+  showError(msg){
+    this.elements.errorText.textContent = msg;
+    this.elements.errorMessage.classList.remove('hidden');
+    this.hideLoading();
   }
 }
 
-// Boot
-document.addEventListener('DOMContentLoaded', () => {
-  new WeatherApp();
-});
+document.addEventListener('DOMContentLoaded', () => new WeatherApp());
 
-// NOTE: Service worker registration is already in index.html.
-// Remove it there if you prefer to register it here instead.
+// Optional offline shell
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}

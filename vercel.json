@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "framework": null,
+  "functions": {
+    "api/*.js": { "runtime": "nodejs20.x" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "01-weather-dashboard",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev",
+    "deploy": "vercel --prod",
+    "build": "echo \"Static project — nothing to build\""
+  }
+}

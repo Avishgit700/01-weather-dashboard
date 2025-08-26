@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WeatherNow — Modern Weather Dashboard</title>
+
+  <!-- Theme / PWA-ish bits -->
+  <meta name="theme-color" content="#0ea5e9" />
+
+  <!-- Social -->
+  <meta property="og:title" content="WeatherNow — Modern Weather Dashboard" />
+  <meta property="og:description" content="Beautiful, fast weather app with hourly & 5-day forecast." />
+  <meta property="og:image" content="/social-card.png" />
+  <meta property="og:url" content="/" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/styles.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="logo">
+        <i class="fas fa-cloud-sun"></i>
+        WeatherNow
+      </h1>
+
+      <div class="search-container">
+        <input type="text" id="cityInput" placeholder="Search for a city…" class="search-input" />
+        <button id="searchBtn" class="search-btn" title="Search">
+          <i class="fas fa-search"></i>
+        </button>
+        <button id="locationBtn" class="location-btn" title="Use current location">
+          <i class="fas fa-location-dot"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading -->
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p>Getting weather data…</p>
+    </div>
+
+    <!-- Error -->
+    <div id="errorMessage" class="error-message hidden">
+      <i class="fas fa-exclamation-triangle"></i>
+      <p id="errorText"></p>
+    </div>
+
+    <!-- Main -->
+    <main class="main-content">
+      <!-- Current -->
+      <section class="current-weather" id="currentWeather">
+        <div class="current-info">
+          <div class="location-date">
+            <h2 id="currentLocation">—</h2>
+            <p id="currentDate">—</p>
+            <p id="currentTime">—</p>
+          </div>
+
+          <div class="weather-main">
+            <div class="temperature-section">
+              <span id="currentTemp">—</span>
+              <div class="weather-icon">
+                <i id="weatherIcon" class="fas fa-sun"></i>
+              </div>
+            </div>
+
+            <div class="weather-description">
+              <p id="weatherDesc">—</p>
+              <p id="feelsLike">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Details grid -->
+        <div class="weather-details">
+          <div class="detail-card">
+            <i class="fas fa-eye"></i>
+            <span class="detail-label">Visibility</span>
+            <span id="visibility" class="detail-value">—</span>
+          </div>
+          <div class="detail-card">
+            <i class="fas fa-droplet"></i>
+            <span class="detail-label">Humidity</span>
+            <span id="humidity" class="detail-value">—</span>
+          </div>
+          <div class="detail-card">
+            <i class="fas fa-wind"></i>
+            <span class="detail-label">Wind</span>
+            <span id="windSpeed" class="detail-value">—</span>
+          </div>
+          <div class="detail-card">
+            <i class="fas fa-thermometer-half"></i>
+            <span class="detail-label">Pressure</span>
+            <span id="pressure" class="detail-value">—</span>
+          </div>
+          <div class="detail-card">
+            <i class="fas fa-sun"></i>
+            <span class="detail-label">UV Index</span>
+            <span id="uvIndex" class="detail-value">—</span>
+          </div>
+          <div class="detail-card">
+            <i class="fas fa-cloud"></i>
+            <span class="detail-label">Clouds</span>
+            <span id="cloudiness" class="detail-value">—</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hourly -->
+      <section class="hourly-forecast">
+        <h3>24-Hour Forecast</h3>
+        <div class="hourly-container" id="hourlyContainer"></div>
+      </section>
+
+      <!-- 5-Day -->
+      <section class="forecast-section">
+        <h3>5-Day Forecast</h3>
+        <div class="forecast-container" id="forecastContainer"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>&copy; 2025 WeatherNow. Powered by OpenWeatherMap</p>
+    </footer>
+  </div>
+
+  <script src="/script.js"></script>
+
+  <!-- Service worker registration (keep this if you REMOVE it from script.js) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered', reg.scope))
+          .catch(err => console.warn('SW registration failed', err));
+      });
+    }
+  </script>
+</body>
+</html>

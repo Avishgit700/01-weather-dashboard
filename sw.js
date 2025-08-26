@@ -1,4 +1,6 @@
-const CACHE = 'weathernow-v1';
+// sw.js
+const CACHE = 'weathernow-v2'; // <= bump this
+
 const ASSETS = ['/', '/index.html', '/styles.css', '/script.js'];
 
 self.addEventListener('install', e => {
